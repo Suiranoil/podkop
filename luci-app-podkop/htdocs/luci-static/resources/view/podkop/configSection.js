@@ -399,6 +399,28 @@ function createConfigSection(section, map, network) {
         return validateUrl(value);
     };
 
+    o = s.taboption('basic', form.Flag, 'custom_srs_rule_set_enabled', _('Custom SRS Rule-Set'), _('Download and use remote SRS rule-set from remote URLs'));
+    o.default = '0';
+    o.rmempty = false;
+    o.ucisection = s.section;
+
+    o = s.taboption('basic', form.DynamicList, 'custom_srs_rule_set', _('Custom SRS Rule-Set URLs'), _('Enter full URLs for .srs files starting with http:// or https://'));
+    o.placeholder = 'URL';
+    o.depends('custom_srs_rule_set_enabled', '1');
+    o.rmempty = false;
+    o.ucisection = s.section;
+    o.validate = function (section_id, value) {
+        if (!value || value.length === 0) return true;
+        const validationResult = validateUrl(value);
+        if (validationResult !== true) {
+            return validationResult;
+        }
+        if (!value.endsWith('.srs')) {
+            return _('URL must end with .srs');
+        }
+        return true;
+    };
+
     o = s.taboption('basic', form.ListValue, 'custom_subnets_list_enabled', _('User Subnet List Type'), _('Select how to add your custom subnets'));
     o.value('disabled', _('Disabled'));
     o.value('dynamic', _('Dynamic List'));
