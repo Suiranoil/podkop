@@ -1582,9 +1582,9 @@ sing_box_rules() {
 
     config_get mode "$section" "mode"
 
-    local invert_json=""
+    local invert_json="{}"
     if [ "$invert" = "1" ]; then
-        invert_json=', "invert": true'
+        invert_json='{"invert": true}'
     fi
 
     if [[ "$mode" == "block" ]]; then
