@@ -901,7 +901,7 @@ sing_box_create_bypass_ruleset() {
     .route.rules += [{
         "inbound": ["tproxy-in"],
         "rule_set": ["bypass"],
-        "outbound": "main",
+        "outbound": "direct-out",
         "action": "route"
     }]' "$SING_BOX_CONFIG" | build_sing_box_config
     
