@@ -570,7 +570,7 @@ prepare_custom_ruleset() {
             "path": $file
         }]' "$SING_BOX_CONFIG" | build_sing_box_config
 
-        sing_box_rules $tag $section
+        sing_box_rules $tag $section $invert_rule
         sing_box_dns_rule_fakeip_section $tag $tag
 
         log "Added 'test' rule_set to sing-box config"
@@ -1578,8 +1578,14 @@ sing_box_rules() {
     log "Configure rule in sing-box"
     local rule_set="$1"
     local outbound="$2"
+    local invert="$3"
 
     config_get mode "$section" "mode"
+
+    local invert_json=""
+    if [ "$invert" = "1" ]; then
+        invert_json=', "invert": true'
+    fi
 
     if [[ "$mode" == "block" ]]; then
         # Action reject
@@ -1590,17 +1596,19 @@ sing_box_rules() {
             # If a rule for rejectexists, add a new rule_set to the existing rule
             jq \
             --arg rule_set "$rule_set" \
-            '(.route.rules[] | select(.inbound == ["tproxy-in"] and .action == "reject") .rule_set) += [$rule_set]' \
+            --argjson invert_json "$invert_json" \
+            '(.route.rules[] | select(.inbound == ["tproxy-in"] and .action == "reject") .rule_set) += [$rule_set] | (.route.rules[] | select(.inbound == ["tproxy-in"] and .action == "reject")) += $invert_json' \
             "$SING_BOX_CONFIG" | build_sing_box_config
         else
             # If there is no rule for reject, create a new one with rule_set
             jq \
             --arg rule_set "$rule_set" \
+            --argjson invert_json "$invert_json" \
             '.route.rules += [{
                 "inbound": ["tproxy-in"],
                 "rule_set": [$rule_set],
                 "action": "reject"
-            }]' "$SING_BOX_CONFIG" | build_sing_box_config
+            } + $invert_json]' "$SING_BOX_CONFIG" | build_sing_box_config
         fi
         return
     else
@@ -1613,19 +1621,21 @@ sing_box_rules() {
             jq \
             --arg rule_set "$rule_set" \
             --arg outbound "$outbound" \
-            '(.route.rules[] | select(.outbound == $outbound and .inbound == ["tproxy-in"]) .rule_set) += [$rule_set]' \
+            --argjson invert_json "$invert_json" \
+            '(.route.rules[] | select(.outbound == $outbound and .inbound == ["tproxy-in"]) .rule_set) += [$rule_set] | (.route.rules[] | select(.outbound == $outbound and .inbound == ["tproxy-in"])) += $invert_json' \
             "$SING_BOX_CONFIG" | build_sing_box_config
         else
             # If there is no rule for tproxy-in, create a new one with rule_set
             jq \
             --arg rule_set "$rule_set" \
             --arg outbound "$outbound" \
+            --argjson invert_json "$invert_json" \
             '.route.rules += [{
                 "inbound": ["tproxy-in"],
                 "rule_set": [$rule_set],
                 "outbound": $outbound,
                 "action": "route"
-            }]' "$SING_BOX_CONFIG" | build_sing_box_config
+            } + $invert_json]' "$SING_BOX_CONFIG" | build_sing_box_config
         fi
     fi
 }
@@ -1686,16 +1696,19 @@ sing_box_ruleset_remote_custom() {
         log "Added new ruleset with tag $tag"
     fi
 
-    sing_box_rules "$tag" "$section"
+    config_get_bool invert_rule "main" "invert_rule" "0"
+
+    sing_box_rules "$tag" "$section" "$invert_rule"
     sing_box_dns_rule_fakeip_section "$tag"
 }
 
 process_custom_srs_rule_set() {
     local section="$1"
     config_get_bool custom_srs_rule_set_enabled "$section" "custom_srs_rule_set_enabled" "0"
+    config_get_bool invert_rule "$section" "invert_rule" "0"
     if [ "$custom_srs_rule_set_enabled" -eq 1 ]; then
         log "Adding a custom srs rule set for $section"
-        config_list_foreach "$section" custom_srs_rule_set sing_box_ruleset_remote_custom "$section"
+        config_list_foreach "$section" custom_srs_rule_set sing_box_ruleset_remote_custom "$section" "$invert_rule"
     fi
 }
 
@@ -1726,7 +1739,7 @@ sing_box_rule_preset() {
 
     if [ "$custom_domains_list_type" != "disabled" ] || [ "$custom_subnets_list_enabled" != "disabled" ] ||
         [ "$custom_local_domains_list_enabled" = "1" ]; then
-        sing_box_rules "$section" "$section"
+        sing_box_rules "$section" "$section" "$invert_rule"
     fi
 
     if [ "$custom_domains_list_type" != "disabled" ] || [ "$custom_local_domains_list_enabled" = "1" ]; then
@@ -1735,8 +1748,9 @@ sing_box_rule_preset() {
 
     config_get domain_list_enabled "$section" "domain_list_enabled"
     config_get domain_list "$section" "domain_list"
+    config_get invert_rule "$section" "invert_rule" "0"
     if [ "$domain_list_enabled" -eq 1 ]; then
-        config_list_foreach $section domain_list sing_box_rules $section
+        config_list_foreach $section domain_list sing_box_rules $section $invert_rule
         config_list_foreach $section domain_list sing_box_dns_rule_fakeip_section domain_list
     fi 
 }

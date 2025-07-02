@@ -234,6 +234,11 @@ function createConfigSection(section, map, network) {
         return true;
     };
 
+    o = s.taboption('basic', form.Flag, 'invert_rule', _('Invert Rule'), _('Invert the rule matching logic'));
+    o.default = '0';
+    o.rmempty = false;
+    o.ucisection = s.section;
+
     o = s.taboption('basic', form.Flag, 'domain_list_enabled', _('Community Lists'));
     o.default = '0';
     o.rmempty = false;
